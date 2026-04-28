@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { CoverImage } from "@/components/CoverImage";
+import { IconButton } from "@/components/IconButton";
 import { usePlaylists, type Playlist } from "@/context/PlaylistsContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -64,6 +65,7 @@ export default function LibraryScreen() {
             topInset={topInset}
             playlistCount={playlists.length}
             videoCount={totalVideos}
+            onSearch={() => router.push("/search")}
           />
         }
         ListEmptyComponent={null}
@@ -102,20 +104,27 @@ function Header({
   topInset,
   playlistCount,
   videoCount,
+  onSearch,
 }: {
   topInset: number;
   playlistCount: number;
   videoCount: number;
+  onSearch: () => void;
 }) {
   const colors = useColors();
   return (
     <View style={{ paddingTop: topInset + 12, paddingBottom: 24 }}>
-      <Text style={[styles.kicker, { color: colors.mutedForeground }]}>
-        Your Vault
-      </Text>
-      <Text style={[styles.title, { color: colors.foreground }]}>
-        Library
-      </Text>
+      <View style={styles.headerTopRow}>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.kicker, { color: colors.mutedForeground }]}>
+            Your Vault
+          </Text>
+          <Text style={[styles.title, { color: colors.foreground }]}>
+            Library
+          </Text>
+        </View>
+        <IconButton icon="search" onPress={onSearch} background="solid" />
+      </View>
       <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
         {playlistCount} {playlistCount === 1 ? "playlist" : "playlists"} ·{" "}
         {videoCount} {videoCount === 1 ? "video" : "videos"}
@@ -230,6 +239,11 @@ function EmptyHint() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  headerTopRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 12,
   },
   kicker: {
     fontFamily: "Inter_500Medium",

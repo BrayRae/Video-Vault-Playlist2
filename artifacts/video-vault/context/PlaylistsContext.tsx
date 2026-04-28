@@ -21,6 +21,7 @@ export type Playlist = {
 
 export type Video = {
   id: string;
+  name: string;
   uri: string;
   thumbnailUri?: string;
   durationMs?: number;
@@ -30,6 +31,7 @@ export type Video = {
 export type NewVideoInput = {
   uri: string;
   durationMs?: number;
+  name?: string;
 };
 
 type State = {
@@ -43,6 +45,9 @@ type ContextValue = {
   videos: Record<string, Video>;
   getPlaylist: (id: string) => Playlist | undefined;
   getVideosForPlaylist: (id: string) => Video[];
+  findPlaylistForVideo: (videoId: string) =>
+    | { playlist: Playlist; index: number }
+    | undefined;
   createPlaylist: (input: { name: string; cover: string }) => Playlist;
   updatePlaylist: (
     id: string,
@@ -54,6 +59,7 @@ type ContextValue = {
     inputs: NewVideoInput[],
   ) => Promise<void>;
   removeVideoFromPlaylist: (playlistId: string, videoId: string) => void;
+  renameVideo: (videoId: string, name: string) => void;
 };
 
 const STORAGE_KEY = "video-vault:state:v1";
@@ -62,6 +68,20 @@ const PlaylistsContext = createContext<ContextValue | null>(null);
 
 const newId = () =>
   Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+
+function defaultNameFromUri(uri: string, fallback: string): string {
+  try {
+    const decoded = decodeURIComponent(uri);
+    const last = decoded.split(/[\\/]/).pop() ?? "";
+    const noExt = last.replace(/\.[^.]+$/, "");
+    const cleaned = noExt.trim();
+    if (!cleaned) return fallback;
+    if (cleaned.length > 60) return cleaned.slice(0, 60);
+    return cleaned;
+  } catch {
+    return fallback;
+  }
+}
 
 async function generateThumbnail(uri: string): Promise<string | undefined> {
   if (Platform.OS === "web") return undefined;
@@ -77,6 +97,18 @@ async function generateThumbnail(uri: string): Promise<string | undefined> {
   }
 }
 
+function migrate(state: State): State {
+  const videos = { ...state.videos };
+  let changed = false;
+  Object.entries(videos).forEach(([id, v]) => {
+    if (!v.name || typeof v.name !== "string") {
+      videos[id] = { ...v, name: defaultNameFromUri(v.uri, "Untitled clip") };
+      changed = true;
+    }
+  });
+  return changed ? { ...state, videos } : state;
+}
+
 export function PlaylistsProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<State>({ playlists: [], videos: {} });
   const [ready, setReady] = useState(false);
@@ -89,7 +121,7 @@ export function PlaylistsProvider({ children }: { children: React.ReactNode }) {
         if (raw) {
           const parsed = JSON.parse(raw) as State;
           if (parsed && Array.isArray(parsed.playlists) && parsed.videos) {
-            setState(parsed);
+            setState(migrate(parsed));
           }
         }
       } catch {
@@ -120,6 +152,17 @@ export function PlaylistsProvider({ children }: { children: React.ReactNode }) {
         .filter((v): v is Video => Boolean(v));
     },
     [state.playlists, state.videos],
+  );
+
+  const findPlaylistForVideo = useCallback(
+    (videoId: string) => {
+      for (const p of state.playlists) {
+        const i = p.videoIds.indexOf(videoId);
+        if (i >= 0) return { playlist: p, index: i };
+      }
+      return undefined;
+    },
+    [state.playlists],
   );
 
   const createPlaylist = useCallback(
@@ -173,11 +216,16 @@ export function PlaylistsProvider({ children }: { children: React.ReactNode }) {
   const addVideosToPlaylist = useCallback(
     async (playlistId: string, inputs: NewVideoInput[]) => {
       const newVideos: Video[] = [];
-      for (const input of inputs) {
+      for (let i = 0; i < inputs.length; i++) {
+        const input = inputs[i];
         const id = newId();
         const thumbnailUri = await generateThumbnail(input.uri);
+        const name =
+          input.name?.trim() ||
+          defaultNameFromUri(input.uri, `Clip ${Date.now()}`);
         newVideos.push({
           id,
+          name,
           uri: input.uri,
           thumbnailUri,
           durationMs: input.durationMs,
@@ -225,6 +273,22 @@ export function PlaylistsProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
+  const renameVideo = useCallback((videoId: string, name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setState((s) => {
+      const existing = s.videos[videoId];
+      if (!existing) return s;
+      return {
+        ...s,
+        videos: {
+          ...s.videos,
+          [videoId]: { ...existing, name: trimmed.slice(0, 80) },
+        },
+      };
+    });
+  }, []);
+
   const value = useMemo<ContextValue>(
     () => ({
       ready,
@@ -232,11 +296,13 @@ export function PlaylistsProvider({ children }: { children: React.ReactNode }) {
       videos: state.videos,
       getPlaylist,
       getVideosForPlaylist,
+      findPlaylistForVideo,
       createPlaylist,
       updatePlaylist,
       deletePlaylist,
       addVideosToPlaylist,
       removeVideoFromPlaylist,
+      renameVideo,
     }),
     [
       ready,
@@ -244,11 +310,13 @@ export function PlaylistsProvider({ children }: { children: React.ReactNode }) {
       state.videos,
       getPlaylist,
       getVideosForPlaylist,
+      findPlaylistForVideo,
       createPlaylist,
       updatePlaylist,
       deletePlaylist,
       addVideosToPlaylist,
       removeVideoFromPlaylist,
+      renameVideo,
     ],
   );
 

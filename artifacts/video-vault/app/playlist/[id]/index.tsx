@@ -136,6 +136,25 @@ export default function PlaylistDetailScreen() {
     ]);
   };
 
+  const onVideoMenu = (video: Video) => {
+    Alert.alert(video.name, undefined, [
+      {
+        text: "Rename",
+        onPress: () =>
+          router.push({
+            pathname: "/video/[videoId]",
+            params: { videoId: video.id },
+          }),
+      },
+      {
+        text: "Remove from Playlist",
+        style: "destructive",
+        onPress: () => onRemoveVideo(video),
+      },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  };
+
   return (
     <View style={[{ flex: 1 }, { backgroundColor: colors.background }]}>
       <FlatList
@@ -168,7 +187,7 @@ export default function PlaylistDetailScreen() {
             video={item}
             index={index}
             onPress={() => onPlayAll(index)}
-            onRemove={() => onRemoveVideo(item)}
+            onMenu={() => onVideoMenu(item)}
           />
         )}
         ListEmptyComponent={
@@ -280,12 +299,12 @@ function VideoRow({
   video,
   index,
   onPress,
-  onRemove,
+  onMenu,
 }: {
   video: Video;
   index: number;
   onPress: () => void;
-  onRemove: () => void;
+  onMenu: () => void;
 }) {
   const colors = useColors();
   const duration = formatDuration(video.durationMs);
@@ -318,20 +337,23 @@ function VideoRow({
         <View style={styles.thumbOverlay}>
           <Feather name="play" size={16} color="#fff" />
         </View>
+        <View style={[styles.indexBadge, { backgroundColor: colors.overlayStrong }]}>
+          <Text style={styles.indexBadgeText}>{index + 1}</Text>
+        </View>
       </View>
       <View style={{ flex: 1 }}>
         <Text
           numberOfLines={1}
           style={[styles.rowTitle, { color: colors.foreground }]}
         >
-          Clip {index + 1}
+          {video.name}
         </Text>
         <Text style={[styles.rowMeta, { color: colors.mutedForeground }]}>
           {duration}
         </Text>
       </View>
       <Pressable
-        onPress={onRemove}
+        onPress={onMenu}
         hitSlop={10}
         style={({ pressed }) => ({
           padding: 8,
@@ -461,6 +483,21 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.55)",
     alignItems: "center",
     justifyContent: "center",
+  },
+  indexBadge: {
+    position: "absolute",
+    top: 4,
+    left: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    minWidth: 20,
+    alignItems: "center",
+  },
+  indexBadgeText: {
+    color: "#fff",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 10,
   },
   rowTitle: {
     fontFamily: "Inter_600SemiBold",

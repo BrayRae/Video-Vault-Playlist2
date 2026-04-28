@@ -50,6 +50,7 @@ export default function FeedScreen() {
     Math.min(initialIndex, Math.max(0, videos.length - 1)),
   );
   const [muted, setMuted] = useState(false);
+  const [userPaused, setUserPaused] = useState(false);
 
   const listRef = useRef<FlatList<Video>>(null);
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 70 }).current;
@@ -59,6 +60,7 @@ export default function FeedScreen() {
       const first = viewableItems[0];
       if (first && typeof first.index === "number") {
         setActiveIndex(first.index);
+        setUserPaused(false);
         if (Platform.OS !== "web") {
           Haptics.selectionAsync().catch(() => {});
         }
@@ -76,6 +78,15 @@ export default function FeedScreen() {
     }
   }, [videos.length, router]);
 
+  const togglePause = useCallback(() => {
+    setUserPaused((p) => {
+      if (Platform.OS !== "web") {
+        Haptics.selectionAsync().catch(() => {});
+      }
+      return !p;
+    });
+  }, []);
+
   const onRemoveActive = useCallback(() => {
     const v = videos[activeIndex];
     if (!v) return;
@@ -89,9 +100,17 @@ export default function FeedScreen() {
     ]);
   }, [videos, activeIndex, removeVideoFromPlaylist, playlistId]);
 
+  const onRenameActive = useCallback(() => {
+    const v = videos[activeIndex];
+    if (!v) return;
+    router.push({ pathname: "/video/[videoId]", params: { videoId: v.id } });
+  }, [videos, activeIndex, router]);
+
   if (!playlist || videos.length === 0) {
     return <View style={{ flex: 1, backgroundColor: "#000" }} />;
   }
+
+  const currentVideo = videos[activeIndex];
 
   return (
     <View style={styles.container}>
@@ -103,8 +122,10 @@ export default function FeedScreen() {
           <FeedItem
             video={item}
             isActive={index === activeIndex}
+            paused={userPaused && index === activeIndex}
             muted={muted}
             height={itemHeight}
+            onTogglePause={togglePause}
           />
         )}
         pagingEnabled
@@ -162,24 +183,35 @@ export default function FeedScreen() {
         pointerEvents="box-none"
         style={[
           styles.sideRail,
-          { bottom: insets.bottom + 80, right: 14 },
+          { bottom: insets.bottom + 110, right: 14 },
         ]}
       >
         <RailButton
-          icon="trash-2"
-          label="Remove"
-          onPress={onRemoveActive}
+          icon={userPaused ? "play" : "pause"}
+          label={userPaused ? "Play" : "Pause"}
+          onPress={togglePause}
+          highlight={userPaused}
         />
+        <RailButton icon="edit-2" label="Rename" onPress={onRenameActive} />
+        <RailButton icon="trash-2" label="Remove" onPress={onRemoveActive} />
       </View>
 
       <View
         pointerEvents="none"
-        style={[styles.bottomOverlay, { paddingBottom: insets.bottom + 24 }]}
+        style={[styles.bottomOverlay, { paddingBottom: insets.bottom + 18 }]}
       >
         <LinearGradient
-          colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.7)"]}
+          colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.75)"]}
           style={StyleSheet.absoluteFillObject}
         />
+        {currentVideo ? (
+          <Text
+            numberOfLines={2}
+            style={styles.currentName}
+          >
+            {currentVideo.name}
+          </Text>
+        ) : null}
         <View style={styles.progressTrack}>
           {videos.map((_, i) => (
             <View
@@ -203,16 +235,18 @@ export default function FeedScreen() {
 function FeedItem({
   video,
   isActive,
+  paused,
   muted,
   height,
+  onTogglePause,
 }: {
   video: Video;
   isActive: boolean;
+  paused: boolean;
   muted: boolean;
   height: number;
+  onTogglePause: () => void;
 }) {
-  const [showPauseIcon, setShowPauseIcon] = useState(false);
-  const [paused, setPaused] = useState(false);
   const player = useVideoPlayer(video.uri, (p) => {
     p.loop = true;
     p.muted = muted;
@@ -230,27 +264,18 @@ function FeedItem({
     player.muted = muted;
   }, [muted, player]);
 
-  const onTap = () => {
-    setPaused((p) => {
-      const next = !p;
-      setShowPauseIcon(true);
-      setTimeout(() => setShowPauseIcon(false), 600);
-      return next;
-    });
-  };
-
   return (
-    <Pressable onPress={onTap} style={[styles.item, { height }]}>
+    <Pressable onPress={onTogglePause} style={[styles.item, { height }]}>
       <VideoView
         player={player}
         style={StyleSheet.absoluteFillObject}
-        contentFit="cover"
+        contentFit="contain"
         nativeControls={false}
         allowsPictureInPicture={false}
       />
-      {showPauseIcon ? (
-        <View style={styles.tapIcon} pointerEvents="none">
-          <Feather name={paused ? "play" : "pause"} size={56} color="#fff" />
+      {isActive && paused ? (
+        <View style={styles.pauseBadge} pointerEvents="none">
+          <Feather name="play" size={48} color="#fff" />
         </View>
       ) : null}
     </Pressable>
@@ -261,17 +286,28 @@ function RailButton({
   icon,
   label,
   onPress,
+  highlight,
 }: {
   icon: keyof typeof Feather.glyphMap;
   label: string;
   onPress: () => void;
+  highlight?: boolean;
 }) {
+  const colors = useColors();
   return (
     <Pressable
       onPress={onPress}
+      hitSlop={8}
       style={({ pressed }) => [styles.railBtn, { opacity: pressed ? 0.7 : 1 }]}
     >
-      <View style={styles.railIcon}>
+      <View
+        style={[
+          styles.railIcon,
+          highlight
+            ? { backgroundColor: colors.primary }
+            : { backgroundColor: "rgba(255,255,255,0.18)" },
+        ]}
+      >
         <Feather name={icon} size={20} color="#fff" />
       </View>
       <Text style={styles.railLabel}>{label}</Text>
@@ -290,12 +326,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  tapIcon: {
+  pauseBadge: {
     position: "absolute",
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: "rgba(0,0,0,0.45)",
+    backgroundColor: "rgba(0,0,0,0.55)",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -340,7 +376,6 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: "rgba(255,255,255,0.15)",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -356,6 +391,15 @@ const styles = StyleSheet.create({
     right: 0,
     paddingTop: 36,
     alignItems: "center",
+    paddingHorizontal: 24,
+  },
+  currentName: {
+    color: "#fff",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+    textAlign: "center",
+    marginBottom: 12,
+    maxWidth: "85%",
   },
   progressTrack: {
     flexDirection: "row",
@@ -363,7 +407,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     flexWrap: "wrap",
-    paddingHorizontal: 24,
   },
   progressDot: {
     height: 4,
