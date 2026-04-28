@@ -4,7 +4,6 @@ import { useRouter } from "expo-router";
 import * as SystemUI from "expo-system-ui";
 import React, { useEffect } from "react";
 import {
-  Alert,
   FlatList,
   Platform,
   Pressable,
@@ -17,6 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { CoverImage } from "@/components/CoverImage";
 import { IconButton } from "@/components/IconButton";
+import { useConfirm } from "@/context/ConfirmContext";
 import { usePlaylists, type Playlist } from "@/context/PlaylistsContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -28,6 +28,7 @@ export default function LibraryScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { ready, playlists, videos, deletePlaylist } = usePlaylists();
+  const confirm = useConfirm();
   const { width } = useWindowDimensions();
 
   useEffect(() => {
@@ -89,36 +90,14 @@ export default function LibraryScreen() {
                   params: { id: item.playlist.id },
                 })
               }
-              onLongPress={() => {
-                Alert.alert(item.playlist.name, undefined, [
-                  {
-                    text: "Open",
-                    onPress: () =>
-                      router.push({
-                        pathname: "/playlist/[id]",
-                        params: { id: item.playlist.id },
-                      }),
-                  },
-                  {
-                    text: "Delete Playlist",
-                    style: "destructive",
-                    onPress: () => {
-                      Alert.alert(
-                        `Delete "${item.playlist.name}"?`,
-                        "Videos only in this playlist will also be removed.",
-                        [
-                          { text: "Cancel", style: "cancel" },
-                          {
-                            text: "Delete",
-                            style: "destructive",
-                            onPress: () => deletePlaylist(item.playlist.id),
-                          },
-                        ],
-                      );
-                    },
-                  },
-                  { text: "Cancel", style: "cancel" },
-                ]);
+              onLongPress={async () => {
+                const ok = await confirm({
+                  title: "Are you sure you want to delete this playlist?",
+                  message: `"${item.playlist.name}" will be removed from your vault.`,
+                  confirmLabel: "Yes, Delete",
+                  destructive: true,
+                });
+                if (ok) deletePlaylist(item.playlist.id);
               }}
             />
           );

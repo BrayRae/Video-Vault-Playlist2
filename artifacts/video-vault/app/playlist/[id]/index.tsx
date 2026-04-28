@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CoverImage } from "@/components/CoverImage";
 import { IconButton } from "@/components/IconButton";
 import { PrimaryButton } from "@/components/PrimaryButton";
+import { useConfirm } from "@/context/ConfirmContext";
 import { usePlaylists, type Video } from "@/context/PlaylistsContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -37,6 +38,7 @@ export default function PlaylistDetailScreen() {
     removeVideoFromPlaylist,
     deleteVideo,
   } = usePlaylists();
+  const confirm = useConfirm();
 
   const playlist = getPlaylist(playlistId);
   const videos = useMemo(
@@ -108,71 +110,44 @@ export default function PlaylistDetailScreen() {
     });
   };
 
-  const onDeletePlaylist = () => {
-    Alert.alert(
-      "Delete playlist?",
-      `"${playlist.name}" will be removed. Videos used in other playlists are kept.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => {
-            deletePlaylist(playlistId);
-            router.replace("/");
-          },
-        },
-      ],
-    );
+  const onDeletePlaylist = async () => {
+    const ok = await confirm({
+      title: "Delete this playlist?",
+      message: `"${playlist.name}" will be removed. Videos used in other playlists are kept.`,
+      confirmLabel: "Yes, Delete",
+      destructive: true,
+    });
+    if (ok) {
+      deletePlaylist(playlistId);
+      router.replace("/");
+    }
   };
 
-  const onRemoveVideo = (video: Video) => {
-    Alert.alert("Remove from playlist?", "This won't delete the video file.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Remove",
-        style: "destructive",
-        onPress: () => removeVideoFromPlaylist(playlistId, video.id),
-      },
-    ]);
+  const onRemoveVideo = async (video: Video) => {
+    const ok = await confirm({
+      title: "Remove from this playlist?",
+      message: `"${video.name}" will stay in your vault and in any other playlists it belongs to.`,
+      confirmLabel: "Yes, Remove",
+      destructive: true,
+    });
+    if (ok) removeVideoFromPlaylist(playlistId, video.id);
   };
 
-  const onDeleteVideo = (video: Video) => {
-    Alert.alert(
-      "Delete this video?",
-      "It will be removed from every playlist in your vault.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => deleteVideo(video.id),
-        },
-      ],
-    );
+  const onDeleteVideo = async (video: Video) => {
+    const ok = await confirm({
+      title: "Are you sure you want to delete this video?",
+      message: `"${video.name}" will be removed from every playlist in your vault.`,
+      confirmLabel: "Yes, Delete",
+      destructive: true,
+    });
+    if (ok) deleteVideo(video.id);
   };
 
-  const onVideoMenu = (video: Video) => {
-    Alert.alert(video.name, undefined, [
-      {
-        text: "Rename",
-        onPress: () =>
-          router.push({
-            pathname: "/video/[videoId]",
-            params: { videoId: video.id },
-          }),
-      },
-      {
-        text: "Remove from Playlist",
-        onPress: () => onRemoveVideo(video),
-      },
-      {
-        text: "Delete Video",
-        style: "destructive",
-        onPress: () => onDeleteVideo(video),
-      },
-      { text: "Cancel", style: "cancel" },
-    ]);
+  const onRenameVideo = (video: Video) => {
+    router.push({
+      pathname: "/video/[videoId]",
+      params: { videoId: video.id },
+    });
   };
 
   return (
@@ -207,7 +182,8 @@ export default function PlaylistDetailScreen() {
             video={item}
             index={index}
             onPress={() => onPlayAll(index)}
-            onMenu={() => onVideoMenu(item)}
+            onRename={() => onRenameVideo(item)}
+            onRemove={() => onRemoveVideo(item)}
             onDelete={() => onDeleteVideo(item)}
           />
         )}
@@ -320,13 +296,15 @@ function VideoRow({
   video,
   index,
   onPress,
-  onMenu,
+  onRename,
+  onRemove,
   onDelete,
 }: {
   video: Video;
   index: number;
   onPress: () => void;
-  onMenu: () => void;
+  onRename: () => void;
+  onRemove: () => void;
   onDelete: () => void;
 }) {
   const colors = useColors();
@@ -376,6 +354,26 @@ function VideoRow({
         </Text>
       </View>
       <Pressable
+        onPress={onRename}
+        hitSlop={10}
+        style={({ pressed }) => ({
+          padding: 8,
+          opacity: pressed ? 0.6 : 1,
+        })}
+      >
+        <Feather name="edit-2" size={16} color={colors.mutedForeground} />
+      </Pressable>
+      <Pressable
+        onPress={onRemove}
+        hitSlop={10}
+        style={({ pressed }) => ({
+          padding: 8,
+          opacity: pressed ? 0.6 : 1,
+        })}
+      >
+        <Feather name="x" size={18} color={colors.mutedForeground} />
+      </Pressable>
+      <Pressable
         onPress={onDelete}
         hitSlop={10}
         style={({ pressed }) => ({
@@ -384,16 +382,6 @@ function VideoRow({
         })}
       >
         <Feather name="trash-2" size={18} color={colors.destructive} />
-      </Pressable>
-      <Pressable
-        onPress={onMenu}
-        hitSlop={10}
-        style={({ pressed }) => ({
-          padding: 8,
-          opacity: pressed ? 0.6 : 1,
-        })}
-      >
-        <Feather name="more-horizontal" size={20} color={colors.mutedForeground} />
       </Pressable>
     </Pressable>
   );

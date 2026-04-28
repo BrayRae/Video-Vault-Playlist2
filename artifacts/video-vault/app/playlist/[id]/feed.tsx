@@ -11,7 +11,6 @@ import React, {
   useState,
 } from "react";
 import {
-  Alert,
   Dimensions,
   FlatList,
   Platform,
@@ -24,6 +23,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { IconButton } from "@/components/IconButton";
+import { useConfirm } from "@/context/ConfirmContext";
 import { usePlaylists, type Video } from "@/context/PlaylistsContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -41,9 +41,9 @@ export default function FeedScreen() {
   const {
     getPlaylist,
     getVideosForPlaylist,
-    removeVideoFromPlaylist,
     deleteVideo,
   } = usePlaylists();
+  const confirm = useConfirm();
   const playlist = getPlaylist(playlistId);
   const videos = useMemo(
     () => (playlist ? getVideosForPlaylist(playlistId) : []),
@@ -119,35 +119,17 @@ export default function FeedScreen() {
     setBoostActive(false);
   }, []);
 
-  const onRemoveActive = useCallback(() => {
+  const onRemoveActive = useCallback(async () => {
     const v = videos[activeIndex];
     if (!v) return;
-    Alert.alert(v.name, "What would you like to do?", [
-      {
-        text: "Remove from Playlist",
-        onPress: () => removeVideoFromPlaylist(playlistId, v.id),
-      },
-      {
-        text: "Delete Video",
-        style: "destructive",
-        onPress: () => {
-          Alert.alert(
-            "Delete this video?",
-            "It will be removed from every playlist in your vault.",
-            [
-              { text: "Cancel", style: "cancel" },
-              {
-                text: "Delete",
-                style: "destructive",
-                onPress: () => deleteVideo(v.id),
-              },
-            ],
-          );
-        },
-      },
-      { text: "Cancel", style: "cancel" },
-    ]);
-  }, [videos, activeIndex, removeVideoFromPlaylist, deleteVideo, playlistId]);
+    const ok = await confirm({
+      title: "Are you sure you want to delete this video?",
+      message: `"${v.name}" will be removed from every playlist in your vault.`,
+      confirmLabel: "Yes, Delete",
+      destructive: true,
+    });
+    if (ok) deleteVideo(v.id);
+  }, [videos, activeIndex, deleteVideo, confirm]);
 
   const onRenameActive = useCallback(() => {
     const v = videos[activeIndex];
