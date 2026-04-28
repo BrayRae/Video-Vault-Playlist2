@@ -208,6 +208,7 @@ export default function PlaylistDetailScreen() {
             index={index}
             onPress={() => onPlayAll(index)}
             onMenu={() => onVideoMenu(item)}
+            onDelete={() => onDeleteVideo(item)}
           />
         )}
         ListEmptyComponent={
@@ -320,11 +321,13 @@ function VideoRow({
   index,
   onPress,
   onMenu,
+  onDelete,
 }: {
   video: Video;
   index: number;
   onPress: () => void;
   onMenu: () => void;
+  onDelete: () => void;
 }) {
   const colors = useColors();
   const duration = formatDuration(video.durationMs);
@@ -372,6 +375,16 @@ function VideoRow({
           {duration}
         </Text>
       </View>
+      <Pressable
+        onPress={onDelete}
+        hitSlop={10}
+        style={({ pressed }) => ({
+          padding: 8,
+          opacity: pressed ? 0.6 : 1,
+        })}
+      >
+        <Feather name="trash-2" size={18} color={colors.destructive} />
+      </Pressable>
       <Pressable
         onPress={onMenu}
         hitSlop={10}

@@ -177,7 +177,6 @@ export default function FeedScreen() {
             height={itemHeight}
             safeTop={safeTop}
             safeBottom={safeBottom}
-            onTogglePause={togglePause}
             onBoostStart={onBoostStart}
             onBoostEnd={onBoostEnd}
           />
@@ -273,7 +272,7 @@ export default function FeedScreen() {
             {currentVideo.name}
           </Text>
         ) : null}
-        <Text style={styles.hintText}>Hold for 2x · Tap to pause</Text>
+        <Text style={styles.hintText}>Hold for 2x · Use button to pause</Text>
         <View style={styles.progressTrack}>
           {videos.map((_, i) => (
             <View
@@ -303,7 +302,6 @@ function FeedItem({
   height,
   safeTop,
   safeBottom,
-  onTogglePause,
   onBoostStart,
   onBoostEnd,
 }: {
@@ -315,7 +313,6 @@ function FeedItem({
   height: number;
   safeTop: number;
   safeBottom: number;
-  onTogglePause: () => void;
   onBoostStart: () => void;
   onBoostEnd: () => void;
 }) {
@@ -346,7 +343,6 @@ function FeedItem({
 
   return (
     <Pressable
-      onPress={onTogglePause}
       onLongPress={onBoostStart}
       onPressOut={onBoostEnd}
       delayLongPress={250}
