@@ -1,0 +1,32 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "XbcgwMR7Zo71WHP3HE0Cu"
+uri = "file://artifacts/video-vault/assets/images/icon.png"
+type = "image"
+title = "video vault app icon"
+
+[[generated]]
+id = "Gr2esEGGQ2FzZgV5tAJJC"
+uri = "file://artifacts/video-vault/assets/images/cover-1.png"
+type = "image"
+title = "playlist cover gradient sunset"
+
+[[generated]]
+id = "fDmkUxH5EvszrXJbUqf66"
+uri = "file://artifacts/video-vault/assets/images/cover-2.png"
+type = "image"
+title = "playlist cover ocean neon"
+
+[[generated]]
+id = "AKsimZtnBAKblhVFHp716"
+uri = "file://artifacts/video-vault/assets/images/cover-3.png"
+type = "image"
+title = "playlist cover sunset peach"
+
+[[generated]]
+id = "ZUrZmcwg-9D1-EDIxp6Af"
+uri = "file://artifacts/video-vault/assets/images/cover-4.png"
+type = "image"
+title = "playlist cover forest"
