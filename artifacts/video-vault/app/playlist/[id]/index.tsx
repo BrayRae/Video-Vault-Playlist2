@@ -35,6 +35,7 @@ export default function PlaylistDetailScreen() {
     addVideosToPlaylist,
     deletePlaylist,
     removeVideoFromPlaylist,
+    deleteVideo,
   } = usePlaylists();
 
   const playlist = getPlaylist(playlistId);
@@ -136,6 +137,21 @@ export default function PlaylistDetailScreen() {
     ]);
   };
 
+  const onDeleteVideo = (video: Video) => {
+    Alert.alert(
+      "Delete this video?",
+      "It will be removed from every playlist in your vault.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => deleteVideo(video.id),
+        },
+      ],
+    );
+  };
+
   const onVideoMenu = (video: Video) => {
     Alert.alert(video.name, undefined, [
       {
@@ -148,8 +164,12 @@ export default function PlaylistDetailScreen() {
       },
       {
         text: "Remove from Playlist",
-        style: "destructive",
         onPress: () => onRemoveVideo(video),
+      },
+      {
+        text: "Delete Video",
+        style: "destructive",
+        onPress: () => onDeleteVideo(video),
       },
       { text: "Cancel", style: "cancel" },
     ]);

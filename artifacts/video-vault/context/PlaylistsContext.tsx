@@ -59,6 +59,7 @@ type ContextValue = {
     inputs: NewVideoInput[],
   ) => Promise<void>;
   removeVideoFromPlaylist: (playlistId: string, videoId: string) => void;
+  deleteVideo: (videoId: string) => void;
   renameVideo: (videoId: string, name: string) => void;
 };
 
@@ -273,6 +274,23 @@ export function PlaylistsProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
+  const deleteVideo = useCallback((videoId: string) => {
+    setState((s) => {
+      const playlists = s.playlists.map((p) =>
+        p.videoIds.includes(videoId)
+          ? {
+              ...p,
+              videoIds: p.videoIds.filter((v) => v !== videoId),
+              updatedAt: Date.now(),
+            }
+          : p,
+      );
+      const videos = { ...s.videos };
+      delete videos[videoId];
+      return { playlists, videos };
+    });
+  }, []);
+
   const renameVideo = useCallback((videoId: string, name: string) => {
     const trimmed = name.trim();
     if (!trimmed) return;
@@ -302,6 +320,7 @@ export function PlaylistsProvider({ children }: { children: React.ReactNode }) {
       deletePlaylist,
       addVideosToPlaylist,
       removeVideoFromPlaylist,
+      deleteVideo,
       renameVideo,
     }),
     [
@@ -316,6 +335,7 @@ export function PlaylistsProvider({ children }: { children: React.ReactNode }) {
       deletePlaylist,
       addVideosToPlaylist,
       removeVideoFromPlaylist,
+      deleteVideo,
       renameVideo,
     ],
   );

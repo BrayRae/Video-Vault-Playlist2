@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import * as SystemUI from "expo-system-ui";
 import React, { useEffect } from "react";
 import {
+  Alert,
   FlatList,
   Platform,
   Pressable,
@@ -26,7 +27,7 @@ export default function LibraryScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { ready, playlists, videos } = usePlaylists();
+  const { ready, playlists, videos, deletePlaylist } = usePlaylists();
   const { width } = useWindowDimensions();
 
   useEffect(() => {
@@ -88,6 +89,37 @@ export default function LibraryScreen() {
                   params: { id: item.playlist.id },
                 })
               }
+              onLongPress={() => {
+                Alert.alert(item.playlist.name, undefined, [
+                  {
+                    text: "Open",
+                    onPress: () =>
+                      router.push({
+                        pathname: "/playlist/[id]",
+                        params: { id: item.playlist.id },
+                      }),
+                  },
+                  {
+                    text: "Delete Playlist",
+                    style: "destructive",
+                    onPress: () => {
+                      Alert.alert(
+                        `Delete "${item.playlist.name}"?`,
+                        "Videos only in this playlist will also be removed.",
+                        [
+                          { text: "Cancel", style: "cancel" },
+                          {
+                            text: "Delete",
+                            style: "destructive",
+                            onPress: () => deletePlaylist(item.playlist.id),
+                          },
+                        ],
+                      );
+                    },
+                  },
+                  { text: "Cancel", style: "cancel" },
+                ]);
+              }}
             />
           );
         }}
@@ -187,15 +219,19 @@ function PlaylistTile({
   width,
   playlist,
   onPress,
+  onLongPress,
 }: {
   width: number;
   playlist: Playlist;
   onPress: () => void;
+  onLongPress: () => void;
 }) {
   const colors = useColors();
   return (
     <Pressable
       onPress={onPress}
+      onLongPress={onLongPress}
+      delayLongPress={350}
       style={({ pressed }) => [{ width, opacity: pressed ? 0.85 : 1 }]}
     >
       <CoverImage
