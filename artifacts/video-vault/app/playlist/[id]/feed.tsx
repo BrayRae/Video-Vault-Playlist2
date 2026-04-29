@@ -300,7 +300,7 @@ function FeedItem({
 }) {
   const player = useVideoPlayer(video.uri, (p) => {
     p.loop = true;
-    p.muted = muted;
+    p.muted = true;
   });
 
   useEffect(() => {
@@ -312,8 +312,8 @@ function FeedItem({
   }, [isActive, paused, player]);
 
   useEffect(() => {
-    player.muted = muted;
-  }, [muted, player]);
+    player.muted = !isActive || muted;
+  }, [muted, isActive, player]);
 
   useEffect(() => {
     try {

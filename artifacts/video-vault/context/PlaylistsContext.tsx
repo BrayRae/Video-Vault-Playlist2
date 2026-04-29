@@ -19,6 +19,15 @@ export type Playlist = {
   updatedAt: number;
 };
 
+export type Folder = {
+  id: string;
+  name: string;
+  cover: string;
+  playlistIds: string[];
+  createdAt: number;
+  updatedAt: number;
+};
+
 export type Video = {
   id: string;
   name: string;
@@ -36,12 +45,14 @@ export type NewVideoInput = {
 
 type State = {
   playlists: Playlist[];
+  folders: Folder[];
   videos: Record<string, Video>;
 };
 
 type ContextValue = {
   ready: boolean;
   playlists: Playlist[];
+  folders: Folder[];
   videos: Record<string, Video>;
   getPlaylist: (id: string) => Playlist | undefined;
   getVideosForPlaylist: (id: string) => Video[];
@@ -61,6 +72,17 @@ type ContextValue = {
   removeVideoFromPlaylist: (playlistId: string, videoId: string) => void;
   deleteVideo: (videoId: string) => void;
   renameVideo: (videoId: string, name: string) => void;
+  // Folders
+  getFolder: (id: string) => Folder | undefined;
+  getPlaylistsForFolder: (id: string) => Playlist[];
+  createFolder: (input: { name: string; cover: string }) => Folder;
+  updateFolder: (
+    id: string,
+    patch: Partial<Pick<Folder, "name" | "cover">>,
+  ) => void;
+  deleteFolder: (id: string) => void;
+  addPlaylistsToFolder: (folderId: string, playlistIds: string[]) => void;
+  removePlaylistFromFolder: (folderId: string, playlistId: string) => void;
 };
 
 const STORAGE_KEY = "video-vault:state:v1";
@@ -98,20 +120,26 @@ async function generateThumbnail(uri: string): Promise<string | undefined> {
   }
 }
 
-function migrate(state: State): State {
-  const videos = { ...state.videos };
-  let changed = false;
+function migrate(state: Partial<State>): State {
+  const playlists = Array.isArray(state.playlists) ? state.playlists : [];
+  const folders = Array.isArray(state.folders) ? state.folders : [];
+  const videosRaw =
+    state.videos && typeof state.videos === "object" ? state.videos : {};
+  const videos: Record<string, Video> = { ...videosRaw };
   Object.entries(videos).forEach(([id, v]) => {
     if (!v.name || typeof v.name !== "string") {
       videos[id] = { ...v, name: defaultNameFromUri(v.uri, "Untitled clip") };
-      changed = true;
     }
   });
-  return changed ? { ...state, videos } : state;
+  return { playlists, folders, videos };
 }
 
 export function PlaylistsProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<State>({ playlists: [], videos: {} });
+  const [state, setState] = useState<State>({
+    playlists: [],
+    folders: [],
+    videos: {},
+  });
   const [ready, setReady] = useState(false);
   const hydrated = useRef(false);
 
@@ -120,8 +148,8 @@ export function PlaylistsProvider({ children }: { children: React.ReactNode }) {
       try {
         const raw = await AsyncStorage.getItem(STORAGE_KEY);
         if (raw) {
-          const parsed = JSON.parse(raw) as State;
-          if (parsed && Array.isArray(parsed.playlists) && parsed.videos) {
+          const parsed = JSON.parse(raw) as Partial<State>;
+          if (parsed && typeof parsed === "object") {
             setState(migrate(parsed));
           }
         }
@@ -210,7 +238,16 @@ export function PlaylistsProvider({ children }: { children: React.ReactNode }) {
       Object.entries(s.videos).forEach(([vid, v]) => {
         if (stillReferenced.has(vid)) videos[vid] = v;
       });
-      return { playlists, videos };
+      const folders = s.folders.map((f) =>
+        f.playlistIds.includes(id)
+          ? {
+              ...f,
+              playlistIds: f.playlistIds.filter((pid) => pid !== id),
+              updatedAt: Date.now(),
+            }
+          : f,
+      );
+      return { playlists, folders, videos };
     });
   }, []);
 
@@ -247,7 +284,7 @@ export function PlaylistsProvider({ children }: { children: React.ReactNode }) {
               }
             : p,
         );
-        return { playlists, videos };
+        return { ...s, playlists, videos };
       });
     },
     [],
@@ -268,7 +305,7 @@ export function PlaylistsProvider({ children }: { children: React.ReactNode }) {
         const stillReferenced = playlists.some((p) => p.videoIds.includes(videoId));
         const videos = { ...s.videos };
         if (!stillReferenced) delete videos[videoId];
-        return { playlists, videos };
+        return { ...s, playlists, videos };
       });
     },
     [],
@@ -287,7 +324,7 @@ export function PlaylistsProvider({ children }: { children: React.ReactNode }) {
       );
       const videos = { ...s.videos };
       delete videos[videoId];
-      return { playlists, videos };
+      return { ...s, playlists, videos };
     });
   }, []);
 
@@ -307,10 +344,105 @@ export function PlaylistsProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  // Folders
+  const getFolder = useCallback(
+    (id: string) => state.folders.find((f) => f.id === id),
+    [state.folders],
+  );
+
+  const getPlaylistsForFolder = useCallback(
+    (id: string) => {
+      const f = state.folders.find((x) => x.id === id);
+      if (!f) return [];
+      return f.playlistIds
+        .map((pid) => state.playlists.find((p) => p.id === pid))
+        .filter((p): p is Playlist => Boolean(p));
+    },
+    [state.folders, state.playlists],
+  );
+
+  const createFolder = useCallback(
+    (input: { name: string; cover: string }) => {
+      const folder: Folder = {
+        id: newId(),
+        name: input.name.trim() || "Untitled",
+        cover: input.cover,
+        playlistIds: [],
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      setState((s) => ({ ...s, folders: [folder, ...s.folders] }));
+      return folder;
+    },
+    [],
+  );
+
+  const updateFolder = useCallback(
+    (id: string, patch: Partial<Pick<Folder, "name" | "cover">>) => {
+      setState((s) => ({
+        ...s,
+        folders: s.folders.map((f) =>
+          f.id === id
+            ? {
+                ...f,
+                ...patch,
+                name: patch.name?.trim() || f.name,
+                updatedAt: Date.now(),
+              }
+            : f,
+        ),
+      }));
+    },
+    [],
+  );
+
+  const deleteFolder = useCallback((id: string) => {
+    setState((s) => ({
+      ...s,
+      folders: s.folders.filter((f) => f.id !== id),
+    }));
+  }, []);
+
+  const addPlaylistsToFolder = useCallback(
+    (folderId: string, playlistIds: string[]) => {
+      setState((s) => ({
+        ...s,
+        folders: s.folders.map((f) => {
+          if (f.id !== folderId) return f;
+          const merged = [...f.playlistIds];
+          playlistIds.forEach((pid) => {
+            if (!merged.includes(pid)) merged.push(pid);
+          });
+          return { ...f, playlistIds: merged, updatedAt: Date.now() };
+        }),
+      }));
+    },
+    [],
+  );
+
+  const removePlaylistFromFolder = useCallback(
+    (folderId: string, playlistId: string) => {
+      setState((s) => ({
+        ...s,
+        folders: s.folders.map((f) =>
+          f.id === folderId
+            ? {
+                ...f,
+                playlistIds: f.playlistIds.filter((p) => p !== playlistId),
+                updatedAt: Date.now(),
+              }
+            : f,
+        ),
+      }));
+    },
+    [],
+  );
+
   const value = useMemo<ContextValue>(
     () => ({
       ready,
       playlists: state.playlists,
+      folders: state.folders,
       videos: state.videos,
       getPlaylist,
       getVideosForPlaylist,
@@ -322,10 +454,18 @@ export function PlaylistsProvider({ children }: { children: React.ReactNode }) {
       removeVideoFromPlaylist,
       deleteVideo,
       renameVideo,
+      getFolder,
+      getPlaylistsForFolder,
+      createFolder,
+      updateFolder,
+      deleteFolder,
+      addPlaylistsToFolder,
+      removePlaylistFromFolder,
     }),
     [
       ready,
       state.playlists,
+      state.folders,
       state.videos,
       getPlaylist,
       getVideosForPlaylist,
@@ -337,6 +477,13 @@ export function PlaylistsProvider({ children }: { children: React.ReactNode }) {
       removeVideoFromPlaylist,
       deleteVideo,
       renameVideo,
+      getFolder,
+      getPlaylistsForFolder,
+      createFolder,
+      updateFolder,
+      deleteFolder,
+      addPlaylistsToFolder,
+      removePlaylistFromFolder,
     ],
   );
 
