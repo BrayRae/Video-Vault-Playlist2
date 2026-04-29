@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
@@ -16,12 +17,42 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { BannerMedia } from "@/components/BannerMedia";
 import { CoverImage } from "@/components/CoverImage";
 import { IconButton } from "@/components/IconButton";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { useConfirm } from "@/context/ConfirmContext";
-import { usePlaylists, type Video } from "@/context/PlaylistsContext";
+import {
+  usePlaylists,
+  type Playlist,
+  type Video,
+} from "@/context/PlaylistsContext";
 import { useColors } from "@/hooks/useColors";
+
+const DEFAULT_THEME = {
+  background: "#0F0B1E",
+  foreground: "#F4EFFF",
+  accent: "#EC4899",
+  accentText: "#FFFFFF",
+};
+
+function resolveTheme(playlist: Playlist) {
+  return {
+    background: playlist.theme?.background ?? DEFAULT_THEME.background,
+    foreground: playlist.theme?.foreground ?? DEFAULT_THEME.foreground,
+    accent: playlist.theme?.accent ?? DEFAULT_THEME.accent,
+    accentText: playlist.theme?.accentText ?? DEFAULT_THEME.accentText,
+  };
+}
+
+function withAlpha(hex: string, alpha: number) {
+  const h = hex.replace("#", "");
+  if (h.length !== 6) return hex;
+  const a = Math.round(Math.max(0, Math.min(1, alpha)) * 255)
+    .toString(16)
+    .padStart(2, "0");
+  return `#${h}${a}`;
+}
 
 export default function PlaylistDetailScreen() {
   const colors = useColors();
@@ -49,7 +80,7 @@ export default function PlaylistDetailScreen() {
   const isWeb = Platform.OS === "web";
   const topInset = isWeb ? 67 : insets.top;
   const bottomInset = isWeb ? 34 : insets.bottom;
-  const heroHeight = Math.min(width, 480);
+  const bannerHeight = Math.min(width * 0.55, 280);
 
   if (!playlist) {
     return (
@@ -72,6 +103,8 @@ export default function PlaylistDetailScreen() {
       </View>
     );
   }
+
+  const theme = resolveTheme(playlist);
 
   const onAddVideos = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -151,7 +184,7 @@ export default function PlaylistDetailScreen() {
   };
 
   return (
-    <View style={[{ flex: 1 }, { backgroundColor: colors.background }]}>
+    <View style={[{ flex: 1 }, { backgroundColor: theme.background }]}>
       <FlatList
         data={videos}
         keyExtractor={(v) => v.id}
@@ -160,10 +193,10 @@ export default function PlaylistDetailScreen() {
         }}
         ListHeaderComponent={
           <Hero
-            heroHeight={heroHeight}
+            playlist={playlist}
+            theme={theme}
+            bannerHeight={bannerHeight}
             topInset={topInset}
-            playlistName={playlist.name}
-            cover={playlist.cover}
             videoCount={videos.length}
             onBack={() => router.back()}
             onEdit={() =>
@@ -181,6 +214,7 @@ export default function PlaylistDetailScreen() {
           <VideoRow
             video={item}
             index={index}
+            theme={theme}
             onPress={() => onPlayAll(index)}
             onRename={() => onRenameVideo(item)}
             onRemove={() => onRemoveVideo(item)}
@@ -188,7 +222,7 @@ export default function PlaylistDetailScreen() {
           />
         )}
         ListEmptyComponent={
-          <EmptyVideos onAdd={onAddVideos} />
+          <EmptyVideos onAdd={onAddVideos} theme={theme} />
         }
         showsVerticalScrollIndicator={false}
       />
@@ -196,11 +230,13 @@ export default function PlaylistDetailScreen() {
   );
 }
 
+type Theme = ReturnType<typeof resolveTheme>;
+
 function Hero({
-  heroHeight,
+  playlist,
+  theme,
+  bannerHeight,
   topInset,
-  playlistName,
-  cover,
   videoCount,
   onBack,
   onEdit,
@@ -208,10 +244,10 @@ function Hero({
   onPlayAll,
   onAddVideos,
 }: {
-  heroHeight: number;
+  playlist: Playlist;
+  theme: Theme;
+  bannerHeight: number;
   topInset: number;
-  playlistName: string;
-  cover: string;
   videoCount: number;
   onBack: () => void;
   onEdit: () => void;
@@ -220,17 +256,24 @@ function Hero({
   onAddVideos: () => void;
 }) {
   const colors = useColors();
+  const bio = playlist.bio?.trim();
+
   return (
     <View>
-      <View style={{ height: heroHeight, position: "relative" }}>
-        <CoverImage
-          cover={cover}
-          rounded={0}
+      {/* Banner */}
+      <View style={{ height: bannerHeight, position: "relative" }}>
+        <BannerMedia
+          banner={playlist.banner ?? null}
+          fallbackCover={playlist.cover}
           style={StyleSheet.absoluteFillObject}
         />
         <LinearGradient
-          colors={["rgba(0,0,0,0.4)", "rgba(0,0,0,0)", colors.background]}
-          locations={[0, 0.4, 1]}
+          colors={[
+            withAlpha(theme.background, 0.0),
+            withAlpha(theme.background, 0.4),
+            withAlpha(theme.background, 1.0),
+          ]}
+          locations={[0, 0.55, 1]}
           style={StyleSheet.absoluteFillObject}
         />
         <View
@@ -239,9 +282,17 @@ function Hero({
             { paddingTop: topInset + 6 },
           ]}
         >
-          <IconButton icon="arrow-left" onPress={onBack} />
+          <IconButton
+            icon="arrow-left"
+            onPress={onBack}
+            color={theme.foreground}
+          />
           <View style={{ flexDirection: "row", gap: 6 }}>
-            <IconButton icon="edit-2" onPress={onEdit} />
+            <IconButton
+              icon="edit-2"
+              onPress={onEdit}
+              color={theme.foreground}
+            />
             <IconButton
               icon="trash-2"
               onPress={onDelete}
@@ -250,51 +301,161 @@ function Hero({
           </View>
         </View>
         <View style={styles.heroCaption}>
-          <Text style={[styles.kicker, { color: "#fff", opacity: 0.8 }]}>
+          <Text
+            style={[styles.kicker, { color: withAlpha(theme.foreground, 0.7) }]}
+          >
             Playlist
           </Text>
           <Text
             numberOfLines={2}
-            style={[styles.heroTitle, { color: "#fff" }]}
+            style={[styles.heroTitle, { color: theme.foreground }]}
           >
-            {playlistName}
-          </Text>
-          <Text style={[styles.heroMeta, { color: "rgba(255,255,255,0.75)" }]}>
-            {videoCount} {videoCount === 1 ? "video" : "videos"}
+            {playlist.name}
           </Text>
         </View>
       </View>
 
-      <View style={styles.actionRow}>
-        <PrimaryButton
-          label={videoCount === 0 ? "Add Videos" : "Play All"}
-          onPress={videoCount === 0 ? onAddVideos : onPlayAll}
-          icon={videoCount === 0 ? "plus" : "play"}
-          style={{ flex: 1 }}
-        />
-        {videoCount > 0 ? (
-          <Pressable
-            onPress={onAddVideos}
-            style={({ pressed }) => [
-              styles.secondaryAction,
-              {
-                backgroundColor: colors.cardElevated,
-                borderRadius: colors.radius,
-                opacity: pressed ? 0.8 : 1,
-              },
+      {/* Split row: cover + play all on left, bio on right */}
+      <View style={styles.splitRow}>
+        <View style={styles.leftCol}>
+          <CoverImage
+            cover={playlist.cover}
+            style={styles.coverThumb}
+            rounded={colors.radius}
+          />
+          <Text
+            style={[styles.metaUnderCover, { color: withAlpha(theme.foreground, 0.7) }]}
+          >
+            {videoCount} {videoCount === 1 ? "video" : "videos"}
+          </Text>
+          <ThemedActionButton
+            label={videoCount === 0 ? "Add Videos" : "Play All"}
+            icon={videoCount === 0 ? "plus" : "play"}
+            onPress={videoCount === 0 ? onAddVideos : onPlayAll}
+            theme={theme}
+          />
+          {videoCount > 0 ? (
+            <Pressable
+              onPress={onAddVideos}
+              style={({ pressed }) => [
+                styles.secondaryAddBtn,
+                {
+                  borderColor: withAlpha(theme.foreground, 0.18),
+                  opacity: pressed ? 0.7 : 1,
+                },
+              ]}
+            >
+              <Feather name="plus" size={14} color={theme.foreground} />
+              <Text
+                style={[
+                  styles.secondaryAddText,
+                  { color: theme.foreground },
+                ]}
+              >
+                Add Videos
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
+
+        <View style={styles.rightCol}>
+          <Text
+            style={[
+              styles.bioLabel,
+              { color: withAlpha(theme.foreground, 0.55) },
             ]}
           >
-            <Feather name="plus" size={20} color={colors.foreground} />
-          </Pressable>
-        ) : null}
+            About
+          </Text>
+          {bio ? (
+            <Text
+              style={[styles.bioText, { color: theme.foreground }]}
+            >
+              {bio}
+            </Text>
+          ) : (
+            <Pressable
+              onPress={onEdit}
+              style={({ pressed }) => [
+                styles.bioEmpty,
+                {
+                  borderColor: withAlpha(theme.foreground, 0.18),
+                  opacity: pressed ? 0.7 : 1,
+                },
+              ]}
+            >
+              <Feather
+                name="edit-3"
+                size={14}
+                color={withAlpha(theme.foreground, 0.6)}
+              />
+              <Text
+                style={[
+                  styles.bioEmptyText,
+                  { color: withAlpha(theme.foreground, 0.6) },
+                ]}
+              >
+                Tap to add a bio for this playlist
+              </Text>
+            </Pressable>
+          )}
+        </View>
       </View>
+
+      {videoCount > 0 ? (
+        <Text
+          style={[
+            styles.sectionLabel,
+            { color: withAlpha(theme.foreground, 0.55) },
+          ]}
+        >
+          Videos
+        </Text>
+      ) : null}
     </View>
+  );
+}
+
+function ThemedActionButton({
+  label,
+  icon,
+  onPress,
+  theme,
+}: {
+  label: string;
+  icon: keyof typeof Feather.glyphMap;
+  onPress: () => void;
+  theme: Theme;
+}) {
+  const handlePress = () => {
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    }
+    onPress();
+  };
+  return (
+    <Pressable
+      onPress={handlePress}
+      style={({ pressed }) => [
+        styles.themedBtn,
+        {
+          backgroundColor: theme.accent,
+          opacity: pressed ? 0.85 : 1,
+        },
+      ]}
+    >
+      <Feather name={icon} size={18} color={theme.accentText} />
+      <Text style={[styles.themedBtnLabel, { color: theme.accentText }]}>
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
 function VideoRow({
   video,
   index,
+  theme,
   onPress,
   onRename,
   onRemove,
@@ -302,6 +463,7 @@ function VideoRow({
 }: {
   video: Video;
   index: number;
+  theme: Theme;
   onPress: () => void;
   onRename: () => void;
   onRemove: () => void;
@@ -309,6 +471,7 @@ function VideoRow({
 }) {
   const colors = useColors();
   const duration = formatDuration(video.durationMs);
+  const muted = withAlpha(theme.foreground, 0.6);
   return (
     <Pressable
       onPress={onPress}
@@ -321,7 +484,7 @@ function VideoRow({
         style={[
           styles.thumb,
           {
-            backgroundColor: colors.cardElevated,
+            backgroundColor: withAlpha(theme.foreground, 0.08),
             borderRadius: 10,
           },
         ]}
@@ -333,23 +496,23 @@ function VideoRow({
             contentFit="cover"
           />
         ) : (
-          <Feather name="play" size={20} color={colors.mutedForeground} />
+          <Feather name="play" size={20} color={muted} />
         )}
         <View style={styles.thumbOverlay}>
           <Feather name="play" size={16} color="#fff" />
         </View>
-        <View style={[styles.indexBadge, { backgroundColor: colors.overlayStrong }]}>
+        <View style={[styles.indexBadge, { backgroundColor: "rgba(0,0,0,0.6)" }]}>
           <Text style={styles.indexBadgeText}>{index + 1}</Text>
         </View>
       </View>
       <View style={{ flex: 1 }}>
         <Text
           numberOfLines={1}
-          style={[styles.rowTitle, { color: colors.foreground }]}
+          style={[styles.rowTitle, { color: theme.foreground }]}
         >
           {video.name}
         </Text>
-        <Text style={[styles.rowMeta, { color: colors.mutedForeground }]}>
+        <Text style={[styles.rowMeta, { color: muted }]}>
           {duration}
         </Text>
       </View>
@@ -361,7 +524,7 @@ function VideoRow({
           opacity: pressed ? 0.6 : 1,
         })}
       >
-        <Feather name="edit-2" size={16} color={colors.mutedForeground} />
+        <Feather name="edit-2" size={16} color={muted} />
       </Pressable>
       <Pressable
         onPress={onRemove}
@@ -371,7 +534,7 @@ function VideoRow({
           opacity: pressed ? 0.6 : 1,
         })}
       >
-        <Feather name="x" size={18} color={colors.mutedForeground} />
+        <Feather name="x" size={18} color={muted} />
       </Pressable>
       <Pressable
         onPress={onDelete}
@@ -387,29 +550,37 @@ function VideoRow({
   );
 }
 
-function EmptyVideos({ onAdd }: { onAdd: () => void }) {
-  const colors = useColors();
+function EmptyVideos({ onAdd, theme }: { onAdd: () => void; theme: Theme }) {
   return (
     <View style={styles.emptyVideos}>
       <View
         style={[
           styles.emptyIcon,
-          { backgroundColor: colors.cardElevated },
+          { backgroundColor: withAlpha(theme.foreground, 0.08) },
         ]}
       >
-        <Feather name="video" size={26} color={colors.mutedForeground} />
+        <Feather
+          name="video"
+          size={26}
+          color={withAlpha(theme.foreground, 0.6)}
+        />
       </View>
-      <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
+      <Text style={[styles.emptyTitle, { color: theme.foreground }]}>
         No videos yet
       </Text>
-      <Text style={[styles.emptyBody, { color: colors.mutedForeground }]}>
+      <Text
+        style={[
+          styles.emptyBody,
+          { color: withAlpha(theme.foreground, 0.6) },
+        ]}
+      >
         Pull videos from your library to start your feed.
       </Text>
-      <PrimaryButton
+      <ThemedActionButton
         label="Add Videos"
         icon="plus"
         onPress={onAdd}
-        style={{ marginTop: 18 }}
+        theme={theme}
       />
     </View>
   );
@@ -446,7 +617,7 @@ const styles = StyleSheet.create({
   },
   heroCaption: {
     position: "absolute",
-    bottom: 24,
+    bottom: 16,
     left: 20,
     right: 20,
   },
@@ -455,31 +626,103 @@ const styles = StyleSheet.create({
     fontSize: 12,
     letterSpacing: 1.6,
     textTransform: "uppercase",
-    marginBottom: 8,
+    marginBottom: 6,
   },
   heroTitle: {
     fontFamily: "Inter_700Bold",
-    fontSize: 36,
+    fontSize: 30,
     letterSpacing: -1,
-    lineHeight: 40,
+    lineHeight: 34,
   },
-  heroMeta: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 13,
-    marginTop: 8,
-  },
-  actionRow: {
+  splitRow: {
     flexDirection: "row",
     paddingHorizontal: 20,
-    paddingTop: 4,
+    paddingTop: 8,
     paddingBottom: 18,
-    gap: 10,
+    gap: 16,
   },
-  secondaryAction: {
-    width: 52,
-    height: 52,
+  leftCol: {
+    width: 144,
+    alignItems: "stretch",
+  },
+  coverThumb: {
+    width: 144,
+    height: 144,
+  },
+  metaUnderCover: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+    marginTop: 10,
+    marginBottom: 8,
+  },
+  themedBtn: {
+    minHeight: 46,
+    borderRadius: 12,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+  },
+  themedBtnLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    letterSpacing: 0.2,
+  },
+  secondaryAddBtn: {
+    marginTop: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 8,
+  },
+  secondaryAddText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+  },
+  rightCol: {
+    flex: 1,
+  },
+  bioLabel: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+    marginBottom: 8,
+  },
+  bioText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  bioEmpty: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderRadius: 12,
+    padding: 14,
+  },
+  bioEmptyText: {
+    flex: 1,
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  sectionLabel: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+    paddingHorizontal: 20,
+    marginTop: 4,
+    marginBottom: 8,
   },
   row: {
     flexDirection: "row",
@@ -533,6 +776,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     paddingVertical: 36,
     alignItems: "center",
+    gap: 8,
   },
   emptyIcon: {
     width: 64,
@@ -550,7 +794,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize: 14,
     textAlign: "center",
-    marginTop: 6,
     lineHeight: 20,
+    marginBottom: 8,
   },
 });

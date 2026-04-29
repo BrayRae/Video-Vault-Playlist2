@@ -10,6 +10,18 @@ import React, {
 } from "react";
 import { Platform } from "react-native";
 
+export type PlaylistBanner = {
+  kind: "image" | "video";
+  uri: string;
+};
+
+export type PlaylistTheme = {
+  background?: string;
+  foreground?: string;
+  accent?: string;
+  accentText?: string;
+};
+
 export type Playlist = {
   id: string;
   name: string;
@@ -17,6 +29,9 @@ export type Playlist = {
   videoIds: string[];
   createdAt: number;
   updatedAt: number;
+  bio?: string;
+  banner?: PlaylistBanner | null;
+  theme?: PlaylistTheme;
 };
 
 export type Folder = {
@@ -62,7 +77,7 @@ type ContextValue = {
   createPlaylist: (input: { name: string; cover: string }) => Playlist;
   updatePlaylist: (
     id: string,
-    patch: Partial<Pick<Playlist, "name" | "cover">>,
+    patch: Partial<Pick<Playlist, "name" | "cover" | "bio" | "banner" | "theme">>,
   ) => void;
   deletePlaylist: (id: string) => void;
   addVideosToPlaylist: (
@@ -211,7 +226,10 @@ export function PlaylistsProvider({ children }: { children: React.ReactNode }) {
   );
 
   const updatePlaylist = useCallback(
-    (id: string, patch: Partial<Pick<Playlist, "name" | "cover">>) => {
+    (
+      id: string,
+      patch: Partial<Pick<Playlist, "name" | "cover" | "bio" | "banner" | "theme">>,
+    ) => {
       setState((s) => ({
         ...s,
         playlists: s.playlists.map((p) =>
@@ -219,7 +237,10 @@ export function PlaylistsProvider({ children }: { children: React.ReactNode }) {
             ? {
                 ...p,
                 ...patch,
-                name: patch.name?.trim() || p.name,
+                name:
+                  patch.name !== undefined
+                    ? patch.name.trim() || p.name
+                    : p.name,
                 updatedAt: Date.now(),
               }
             : p,
