@@ -303,11 +303,30 @@ function FeedItem({
     p.muted = true;
   });
 
+  const wasActiveRef = useRef(false);
   useEffect(() => {
-    if (isActive && !paused) {
-      player.play();
+    if (isActive) {
+      if (!wasActiveRef.current) {
+        try {
+          player.currentTime = 0;
+        } catch {
+          // ignore if runtime doesn't allow setting before load
+        }
+      }
+      wasActiveRef.current = true;
+      if (!paused) {
+        player.play();
+      } else {
+        player.pause();
+      }
     } else {
+      wasActiveRef.current = false;
       player.pause();
+      try {
+        player.currentTime = 0;
+      } catch {
+        // ignore
+      }
     }
   }, [isActive, paused, player]);
 
