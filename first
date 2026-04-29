@@ -1,0 +1,175 @@
+import React, { useState } from "react";
+
+export default function PlaylistUI() {
+  const [theme, setTheme] = useState({
+    banner: {
+      type: "color",
+      value: "#111111",
+    },
+    addVideoSection: {
+      type: "color",
+      value: "#1a1a1a",
+    },
+  });
+
+  const setThemeValue = (key, value) => {
+    setTheme((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
+  };
+
+  const renderBackground = (section) => {
+    const data = theme[section];
+
+    if (data.type === "image") {
+      return {
+        backgroundImage: `url(${data.value})`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      };
+    }
+
+    return { backgroundColor: data.value };
+  };
+
+  return (
+    <div className="app-container">
+
+      {/* 🔷 BANNER */}
+      <div className="banner" style={renderBackground("banner")}>
+        <h1>Video Vault</h1>
+      </div>
+
+      {/* 🔷 PLAYLIST CONTENT */}
+      <div className="playlist-content">
+
+        {/* ADD VIDEO SECTION */}
+        <div
+          className="add-video-section"
+          style={renderBackground("addVideoSection")}
+        >
+          <button>+ Add Video</button>
+        </div>
+
+        {/* PLAYLIST GRID */}
+        <div className="playlist-grid">
+          <div className="playlist-cover">
+            <img src="https://placehold.co/300x180" alt="cover" />
+          </div>
+        </div>
+
+        {/* ABOUT SECTION (MOVED LOWER) */}
+        <div className="about-section">
+          <h2>About</h2>
+          <p>This is your video vault playlist app.</p>
+        </div>
+
+        {/* THEME EDITOR */}
+        <div className="theme-editor">
+          <h3>Theme Settings</h3>
+
+          {/* Banner color/image */}
+          <label>Banner Background</label>
+          <select
+            onChange={(e) =>
+              setThemeValue("banner", {
+                ...theme.banner,
+                type: e.target.value,
+              })
+            }
+          >
+            <option value="color">Color</option>
+            <option value="image">Image</option>
+          </select>
+
+          <input
+            type="text"
+            placeholder="Color or Image URL"
+            onChange={(e) =>
+              setThemeValue("banner", {
+                ...theme.banner,
+                value: e.target.value,
+              })
+            }
+          />
+
+          {/* Add Video Section */}
+          <label>Add Video Section</label>
+          <select
+            onChange={(e) =>
+              setThemeValue("addVideoSection", {
+                ...theme.addVideoSection,
+                type: e.target.value,
+              })
+            }
+          >
+            <option value="color">Color</option>
+            <option value="image">Image</option>
+          </select>
+
+          <input
+            type="text"
+            placeholder="Color or Image URL"
+            onChange={(e) =>
+              setThemeValue("addVideoSection", {
+                ...theme.addVideoSection,
+                value: e.target.value,
+              })
+            }
+          />
+        </div>
+      </div>
+
+      {/* STYLES */}
+      <style>{`
+        .banner {
+          height: 260px;
+          display: flex;
+          align-items: flex-end;
+          padding: 20px;
+          color: white;
+          background: #111;
+        }
+
+        /* ❌ Removed fade overlay completely */
+
+        .playlist-content {
+          padding: 20px;
+        }
+
+        .add-video-section {
+          padding: 15px;
+          border-radius: 12px;
+          margin-bottom: 20px;
+        }
+
+        .playlist-grid {
+          display: grid;
+          gap: 10px;
+        }
+
+        .playlist-cover img {
+          width: 100%;
+          border-radius: 10px;
+          /* ❌ removed dark overlay / brightness filter */
+        }
+
+        .about-section {
+          margin-top: 90px; /* moved lower */
+        }
+
+        .theme-editor {
+          margin-top: 40px;
+          padding: 15px;
+          border-top: 1px solid #333;
+        }
+
+        input, select {
+          display: block;
+          margin: 8px 0 15px;
+        }
+      `}</style>
+    </div>
+  );
+}
