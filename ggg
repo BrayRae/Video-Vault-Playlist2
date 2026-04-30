@@ -1,0 +1,52 @@
+/* Styles for Playlist Layout Enhancements */
+
+/* Adjust the About section's position lower on the page */
+.about-section {
+  margin-top: 2rem; /* Increase spacing above for better layout */
+}
+
+/* Extend the banner vertically for a taller and more prominent appearance */
+.banner {
+  height: 300px; /* Adjust height as needed */
+  background-size: cover; /* Ensure the banner image scales well */
+  background-position: center;
+}
+
+/* Remove the fade effect where page background blends with the banner */
+.banner::after {
+  content: none; /* Disable any overlay or fade effect */
+}
+
+/* Clean separation between sections */
+.page-section {
+  background-color: #ffffff; /* Add solid background for clear separation */
+}
+
+/* Remove the black gradient/fade overlay on playlist cover images */
+.playlist-cover {
+  background: none; /* Remove gradient overlay */
+  filter: none; /* Ensure no filtering for maximum clarity */
+}
+
+/* Additional customizable theme color setting for the section beneath "+ Add Video" button */
+.theme-custom {
+  background-color: var(--custom-theme-color, #f0f0f0); /* Default color with CSS variable */
+  padding: 1rem;
+  border-radius: 8px;
+}
+
+/* Allow photo/image background for customizable areas */
+.theme-background {
+  background: url('path-to-image.jpg') center/cover no-repeat; /* Replace with the user's chosen image */
+}
+
+/* Add Video button */
+.add-video-section {
+  margin-top: 1rem;
+}
+
+/* Ensure image backgrounds adapt responsively */
+.image-background {
+  height: auto;
+  width: 100%;
+}
